@@ -9,13 +9,16 @@ import {
   AppRegistry,
   StyleSheet,
   Text,
-  View
+  ListView,
+  View,
+  AlertIOS
 } from 'react-native';
 import firebase from 'firebase';
 import styles from './styles';
 
 import StatusBar from './components/StatusBar';
 import ActionButton from './components/ActionButton';
+import ListItem from './components/ListItem';
 
 // Initialize Firebase
 const firebaseConfig = {
@@ -27,44 +30,93 @@ const firebaseConfig = {
 };
 const firebaseApp = firebase.initializeApp(firebaseConfig);
 
-export default class ReactNativeFirebaseDemo extends Component {
-  render() {
+class ReactNativeFirebaseDemo extends Component {
+  constructor(props) {
+    super(props);
+    this.itemsRef = firebaseApp.database().ref().child('items');
+
+    this.state = {
+      dataSource: new ListView.DataSource({
+        rowHasChanged: (r1, r2) => r1 !== r2}
+      ),
+    };
+  }
+
+  componentDidMount() {
+    this.listenForItems(this.itemsRef);
+  };
+
+  _renderItem = (item) => {
+    const onPress = () => {
+      AlertIOS.prompt(
+        'Complete',
+        null,
+        [
+          {
+            text: 'Complete',
+            onPress: (text) => this.itemsRef.child(item._key).remove()
+          },
+          {
+            text: 'Cancel',
+            onPress: (text) => console.log('Cancel')
+          },
+        ],
+        'default'
+      );
+    };
+
+    return <ListItem item={item} onPress={onPress} />
+  };
+
+  listenForItems(itemsRef) {
+    itemsRef.on('value', (snap) => {
+      // get children as an array
+      var items = [];
+      snap.forEach((child) => {
+        items.push({
+          title: child.val().title,
+          _key: child.key
+        });
+      });
+
+      this.setState({
+        dataSource: this.state.dataSource.cloneWithRows(items)
+      })
+    });
+  }
+
+  _addItem() {
+    AlertIOS.prompt(
+      'Add new item',
+      null,
+      [
+        {
+          text: 'Add',
+          onPress: (text) => {
+            this.itemsRef.push({title: text});
+          }
+        },
+        {
+          text: 'Cancel',
+          onPress: (text) => console.log('Cancel')
+        }
+      ],
+      'plain-text'
+    )
+  }
+
+  render(){
     return (
       <View style={styles.container}>
         <StatusBar title="Grocery App" />
-        <Text style={styles.welcome}>
-          Welcome to React Native with some Firebase!
-        </Text>
-        <Text style={styles.instructions}>
-          To get started, edit index.ios.js
-        </Text>
-        <Text style={styles.instructions}>
-          Press Cmd+R to reload,{'\n'}
-          Cmd+D or shake for dev menu
-        </Text>
-        <ActionButton title="Next"></ActionButton>
+        <ListView
+          dataSource={this.state.dataSource}
+          renderRow={this._renderItem.bind(this)}
+          style={styles.listview}></ListView>
+        <ActionButton title="Add" onPress={this._addItem.bind(this)}></ActionButton>
       </View>
     );
   }
 }
-
-// const styles = StyleSheet.create({
-//   container: {
-//     flex: 1,
-//     justifyContent: 'center',
-//     alignItems: 'center',
-//     backgroundColor: '#F5FCFF',
-//   },
-//   welcome: {
-//     fontSize: 20,
-//     textAlign: 'center',
-//     margin: 10,
-//   },
-//   instructions: {
-//     textAlign: 'center',
-//     color: '#333333',
-//     marginBottom: 5,
-//   },
-// });
 
 AppRegistry.registerComponent('ReactNativeFirebaseDemo', () => ReactNativeFirebaseDemo);
